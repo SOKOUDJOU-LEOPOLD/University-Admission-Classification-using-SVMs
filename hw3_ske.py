@@ -29,12 +29,21 @@ class DataLoader:
         self.val_data = pd.DataFrame()
         
         # TODO：complete your dataloader here!
+        
+        # read data
+        df = pd.read_csv(data_path)
+
+        # create the label
+        df2 = self.create_binary_label(df)
     
     def create_binary_label(self, df: pd.DataFrame) -> pd.DataFrame:
         '''
         Create a binary label for the training data.
         '''
-        pass
+        med = df["Chance of Admit"].median()
+        df = df.copy()
+        df["label"] = (df["Chance of Admit"] > med).astype(int)
+        return df
 
 class SVMTrainer:
     def __init__(self):

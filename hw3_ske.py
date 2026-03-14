@@ -34,7 +34,32 @@ class DataLoader:
         df = pd.read_csv(data_path)
 
         # create the label
-        df2 = self.create_binary_label(df)
+        df = self.create_binary_label(df)
+
+        # Drop non-feature columns
+        drop_cols = []
+        if "Serial No." in df.columns:
+            drop_cols.append("Serial No.")
+        if "Chance of Admit" in df.columns:
+            drop_cols.append("Chance of Admit")
+        df = df.drop(columns=drop_cols)
+
+        # 80/20 split
+        idx = np.arange(len(df))
+        split = int(0.8 * len(df))
+        train_idx, val_idx = idx[:split], idx[split:]
+
+        self.train_data = df.iloc[train_idx].reset_index(drop=True)
+        self.val_data = df.iloc[val_idx].reset_index(drop=True)
+
+        # Standardize features using TRAIN stats only
+        self.feature_cols = [c for c in df.columns if c != "label"]
+        means = self.train_data[self.feature_cols].mean()
+        stds = self.train_data[self.feature_cols].std().replace(0.0, 1.0)
+
+        self.train_data[self.feature_cols] = (self.train_data[self.feature_cols] - means) / stds
+        self.val_data[self.feature_cols] = (self.val_data[self.feature_cols] - means) / stds
+
     
     def create_binary_label(self, df: pd.DataFrame) -> pd.DataFrame:
         '''

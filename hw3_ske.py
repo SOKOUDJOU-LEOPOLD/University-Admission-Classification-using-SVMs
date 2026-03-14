@@ -86,14 +86,21 @@ class SVMTrainer:
         Returns:
             SVC: Trained sklearn.svm.SVC model
         '''
-        pass
-    
+        model = SVC(kernel=kernel, **kwargs)
+        model.fit(X_train, y_train)
+        return model         
+
     def get_support_vectors(self,model: SVC) -> np.ndarray:
         '''
         Get the support vectors from the trained SVM model.
         '''
         pass
-    
+
+ # Initialize 3 different SVM models with the following kernels
+svm_linear = SVC(kernel="linear")
+svm_rbf = SVC(kernel="rbf")
+svm_poly3 = SVC(kernel="poly", degree=3) 
+
 '''
 Initialize my_best_model with the best model you found.
 '''

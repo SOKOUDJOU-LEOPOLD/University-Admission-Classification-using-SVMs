@@ -94,12 +94,75 @@ class SVMTrainer:
         '''
         Get the support vectors from the trained SVM model.
         '''
-        pass
+        return model.support_vectors_
 
  # Initialize 3 different SVM models with the following kernels
 svm_linear = SVC(kernel="linear")
 svm_rbf = SVC(kernel="rbf")
 svm_poly3 = SVC(kernel="poly", degree=3) 
+
+# 2.1.3 (c) Feature Selection and Model Training
+# Train each kernel (linear/rbf/poly3) with each requested feature pair.
+
+def train_models_for_feature_pairs(
+    train_df: pd.DataFrame,
+    feature_pairs=None,
+    # random_state: int = 42
+):
+    """
+    Returns:
+        models: dict with keys (kernel, (feat1, feat2)) and values = trained SVC
+    """
+    if feature_pairs is None:
+        feature_pairs = [
+            ("CGPA", "SOP"),
+            ("CGPA", "GRE Score"),
+            ("SOP", "LOR"),
+            ("LOR", "GRE Score"),
+        ]
+
+    trainer = SVMTrainer()
+
+    kernels = [
+        ("linear", dict()),                 
+        ("rbf", dict()),                    
+        ("poly", dict(degree=3)), 
+    ]
+
+    models = {}
+
+    y_train = train_df["label"].to_numpy(dtype=int)
+
+    for feat1, feat2 in feature_pairs:
+        X_train = train_df[[feat1, feat2]].to_numpy(dtype=float)
+
+        for kernel_name, params in kernels:
+            model = trainer.train(X_train, y_train, kernel=kernel_name, **params)
+            models[(kernel_name, (feat1, feat2))] = model
+
+    return models
+
+# 2.1.4 (d) Support Vectors
+# Identify support vectors for each trained model + feature combination.
+
+def get_support_vectors_for_models(trained_models: dict) -> dict:
+    """
+    Args:
+        trained_models: dict from train_models_for_feature_pairs()
+                       keys: (kernel_name, (feat1, feat2))
+                       values: trained SVC
+
+    Returns:
+        support_vectors: dict with same keys as trained_models,
+                         values: np.ndarray of support vectors (in that feature space)
+    """
+    trainer = SVMTrainer()
+    support_vectors = {}
+
+    for key, model in trained_models.items():
+        support_vectors[key] = trainer.get_support_vectors(model)
+
+    return support_vectors
 
 '''
 Initialize my_best_model with the best model you found.

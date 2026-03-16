@@ -216,6 +216,96 @@ def plot_kernel_feature_predictions(train_df, trained_models):
     plt.tight_layout()
     plt.show()
 
+
+
+def _accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    y_true = np.asarray(y_true).astype(int)
+    y_pred = np.asarray(y_pred).astype(int)
+    return float((y_true == y_pred).mean())
+
+# 2.1.6 (f) Result Analysis 
+# Determine the best feature-kernel combination based on training set figures. Validate the model on 
+# the validation split and find the best performing combination with respect to accuracy. Initialize 
+# my best model variable using your best model combination. Tune hyperparameter and aim for 
+# 0.83 accuracy on our reserved test set. 
+def select_best_model_and_set_global(loader: DataLoader):
+    """
+    Trains/tunes all kernel-feature combinations, evaluates on validation,
+    selects best by validation accuracy, and sets global my_best_model.
+
+    Returns:
+        best_model: SVC
+        best_info: dict with details
+    """
+    global my_best_model
+
+    trainer = SVMTrainer()
+
+    feature_pairs = [
+        ("CGPA", "SOP"),
+        ("CGPA", "GRE Score"),
+        ("SOP", "LOR"),
+        ("LOR", "GRE Score"),
+    ]
+
+    # Small manual hyperparameter grids
+    grid = {
+        "linear": [
+            {"C": 0.1},
+            {"C": 1.0},
+            {"C": 10.0},
+        ],
+        "rbf": [
+            {"C": 0.5, "gamma": "scale"},
+            {"C": 1.0, "gamma": "scale"},
+            {"C": 10.0, "gamma": "scale"},
+            {"C": 10.0, "gamma": 0.5},
+            {"C": 10.0, "gamma": 0.1},
+        ],
+        "poly": [
+            {"C": 0.1, "degree": 3, "gamma": "scale", "coef0": 0.0},
+            {"C": 1.0, "degree": 3, "gamma": "scale", "coef0": 0.0},
+            {"C": 1.0, "degree": 3, "gamma": "scale", "coef0": 1.0},
+            {"C": 10.0, "degree": 3, "gamma": "scale", "coef0": 1.0},
+        ],
+    }
+
+    best = {
+        "val_acc": -1.0,
+        "kernel": None,
+        "features": None,
+        "params": None,
+        "model": None,
+    }
+
+    # Evaluate each combo on validation
+    for feats in feature_pairs:
+        X_tr = loader.train_data[list(feats)].to_numpy(dtype=float)
+        y_tr = loader.train_data["label"].to_numpy(dtype=int)
+
+        X_va = loader.val_data[list(feats)].to_numpy(dtype=float)
+        y_va = loader.val_data["label"].to_numpy(dtype=int)
+
+        for kernel in ["linear", "rbf", "poly"]:
+            for params in grid[kernel]:
+                model = trainer.train(X_tr, y_tr, kernel=kernel, **params)
+                pred = model.predict(X_va)
+                acc = _accuracy(y_va, pred)
+
+                if acc > best["val_acc"]:
+                    best["val_acc"] = acc
+                    best["kernel"] = kernel
+                    best["features"] = feats
+                    best["params"] = params
+                    best["model"] = model
+
+    # Retrain best on training split 
+    X_tr_best = loader.train_data[list(best["features"])].to_numpy(dtype=float)
+    y_tr_best = loader.train_data["label"].to_numpy(dtype=int)
+    my_best_model = trainer.train(X_tr_best, y_tr_best, kernel=best["kernel"], **best["params"])
+
+    return my_best_model, best
+
 '''
 Initialize my_best_model with the best model you found.
 '''
@@ -232,3 +322,9 @@ if __name__ == "__main__":
     plot_kernel_feature_predictions(loader.train_data, trained_models)
     # plt.savefig("svm_kernel_feature_grid.png", dpi=300)
 
+    best_model, best_info = select_best_model_and_set_global(loader)
+
+    print("Best validation accuracy:", best_info["val_acc"])
+    print("Best kernel:", best_info["kernel"])
+    print("Best features:", best_info["features"])
+    print("Best params:", best_info["params"])

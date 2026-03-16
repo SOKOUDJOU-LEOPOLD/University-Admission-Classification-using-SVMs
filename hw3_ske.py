@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.svm import SVC
@@ -164,6 +165,57 @@ def get_support_vectors_for_models(trained_models: dict) -> dict:
 
     return support_vectors
 
+# 2.1.5 (e) Result Visualization 
+# Visualize the predictions for each kernel-feature combination on the training set. Use color coding 
+# for labels. Include this figure in your report.
+def plot_kernel_feature_predictions(train_df, trained_models):
+    feature_pairs = [
+        ("CGPA", "SOP"),
+        ("CGPA", "GRE Score"),
+        ("SOP", "LOR"),
+        ("LOR", "GRE Score"),
+    ]
+    kernels = ["linear", "rbf", "poly"]
+
+    fig, axes = plt.subplots(len(feature_pairs), len(kernels), figsize=(15, 16))
+    fig.suptitle("SVM Predictions on Training Set (by Kernel + Feature Pair)", y=1.02)
+
+    for i, (f1, f2) in enumerate(feature_pairs):
+        X = train_df[[f1, f2]].to_numpy(dtype=float)
+        y = train_df["label"].to_numpy(dtype=int)
+
+        # Mesh grid for decision regions
+        x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
+        y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
+        xx, yy = np.meshgrid(
+            np.linspace(x_min, x_max, 300),
+            np.linspace(y_min, y_max, 300),
+        )
+        grid = np.c_[xx.ravel(), yy.ravel()]
+
+        for j, k in enumerate(kernels):
+            ax = axes[i, j]
+            model = trained_models[(k, (f1, f2))]
+
+            Z = model.predict(grid).reshape(xx.shape)
+
+            # Background = predicted class
+            ax.contourf(xx, yy, Z, alpha=0.25, levels=[-0.5, 0.5, 1.5], cmap="coolwarm")
+
+            # Points = true labels (color-coded)
+            ax.scatter(X[y == 0, 0], X[y == 0, 1], s=18, c="tab:blue", label="label=0")
+            ax.scatter(X[y == 1, 0], X[y == 1, 1], s=18, c="tab:orange", label="label=1")
+
+            ax.set_title(f"{k} | {f1} vs {f2}")
+            ax.set_xlabel(f1)
+            ax.set_ylabel(f2)
+
+    # Single legend for the full figure
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper right")
+    plt.tight_layout()
+    plt.show()
+
 '''
 Initialize my_best_model with the best model you found.
 '''
@@ -171,3 +223,12 @@ my_best_model = SVC()
 
 if __name__ == "__main__":
     print("Hello, World!")
+    loader = DataLoader(data_path="./hw3-univ-app-data.csv")
+    trained_models = train_models_for_feature_pairs(loader.train_data)
+
+    support_vectors = get_support_vectors_for_models(trained_models)
+    sv_linear_cgpa_sop = support_vectors[("linear", ("CGPA", "SOP"))]
+
+    plot_kernel_feature_predictions(loader.train_data, trained_models)
+    # plt.savefig("svm_kernel_feature_grid.png", dpi=300)
+

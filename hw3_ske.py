@@ -46,20 +46,25 @@ class DataLoader:
         df = df.drop(columns=drop_cols)
 
         # 80/20 split
+        # rng = np.random.RandomState(42)
         idx = np.arange(len(df))
+        # rng.shuffle(idx)
+        
         split = int(0.8 * len(df))
         train_idx, val_idx = idx[:split], idx[split:]
 
         self.train_data = df.iloc[train_idx].reset_index(drop=True)
         self.val_data = df.iloc[val_idx].reset_index(drop=True)
 
-        # Standardize features using TRAIN stats only
-        self.feature_cols = [c for c in df.columns if c != "label"]
-        means = self.train_data[self.feature_cols].mean()
-        stds = self.train_data[self.feature_cols].std().replace(0.0, 1.0)
+        # Why is it that when I remove the standardization on the features I reached a score of 50/50 and had the same number of support vectors which is 34? -> does that mean that standardization changes the relative positions of points and is this the problem?
 
-        self.train_data[self.feature_cols] = (self.train_data[self.feature_cols] - means) / stds
-        self.val_data[self.feature_cols] = (self.val_data[self.feature_cols] - means) / stds
+        # Standardize features using TRAIN stats only
+        # self.feature_cols = [c for c in df.columns if c != "label"]
+        # means = self.train_data[self.feature_cols].mean()
+        # stds = self.train_data[self.feature_cols].std().replace(0.0, 1.0)
+
+        # self.train_data[self.feature_cols] = (self.train_data[self.feature_cols] - means) / stds
+        # self.val_data[self.feature_cols] = (self.val_data[self.feature_cols] - means) / stds
 
     
     def create_binary_label(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -87,7 +92,9 @@ class SVMTrainer:
         Returns:
             SVC: Trained sklearn.svm.SVC model
         '''
-        model = SVC(kernel=kernel, **kwargs)
+        params = {"C": 1.0}  
+        params.update(kwargs)
+        model = SVC(kernel=kernel, **params)
         model.fit(X_train, y_train)
         return model         
 
@@ -125,9 +132,9 @@ def train_models_for_feature_pairs(
     trainer = SVMTrainer()
 
     kernels = [
-        ("linear", dict()),                 
-        ("rbf", dict()),                    
-        ("poly", dict(degree=3)), 
+        ("linear", dict(C=1.0)),
+        ("rbf", dict(C=1.0, gamma="scale")),
+        ("poly", dict(C=1.0, degree=3, gamma="scale", coef0=0.0)),
     ]
 
     models = {}
@@ -237,7 +244,7 @@ def select_best_model_and_set_global(loader: DataLoader):
         best_model: SVC
         best_info: dict with details
     """
-    global my_best_model
+    # global my_best_model
 
     trainer = SVMTrainer()
 
@@ -309,7 +316,8 @@ def select_best_model_and_set_global(loader: DataLoader):
 '''
 Initialize my_best_model with the best model you found.
 '''
-my_best_model = SVC()
+# my_best_model = SVC(kernel="linear", C=1.0)  # when I standardize the data
+my_best_model = SVC(kernel = 'rbf', C=10.0, gamma=0.5)
 
 if __name__ == "__main__":
     print("Hello, World!")
@@ -317,6 +325,12 @@ if __name__ == "__main__":
     trained_models = train_models_for_feature_pairs(loader.train_data)
 
     support_vectors = get_support_vectors_for_models(trained_models)
+    # printing the first 10 support vectors for each trained model
+    print("Support Vectors: ")
+    for key, sv in support_vectors.items():
+        print(f"\nSupport vectors for {key}:")
+        for i in range(min(10, len(sv))):
+            print(sv[i])
     sv_linear_cgpa_sop = support_vectors[("linear", ("CGPA", "SOP"))]
 
     plot_kernel_feature_predictions(loader.train_data, trained_models)
